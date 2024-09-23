@@ -347,7 +347,10 @@ def detect_potholescore_with_ID(image_id):
         #     print("Error: result_img_pil is not a PIL Image.")
         #     processed_image_base64 = None
         
+
+
         processed_image_base64 = 50
+
         # Update the database with the detection results
         with connection.cursor() as cursor:
             print("Updating the image_data tbl with processed results")
@@ -385,76 +388,58 @@ def detect_potholescore_with_ID(image_id):
         print(f"Error detecting potholes: {e}")
         return None, None, None
     
-    
+
+##################################################################
+### Code below commented to test the function with same name added on 22 Sept 2024
+# ############################################################## 
 
 # def generate_annotated_image(results):
 #     # Create a blank image or use an existing image
 #     width, height = 640, 640  # Example dimensions
 #     image = Image.new('RGB', (width, height), (255, 255, 255))  # Create a white image
-    
+
+#     # Specify the folder and file path
+#     folder_path = "C:\\Users\\Mangales\\Desktop\\App\\fastapi-anvil"
+#     file_path = os.path.join(folder_path, "output_image_with_boxes.png")
+
 #     # Draw bounding boxes on the image
 #     draw = ImageDraw.Draw(image)
 #     print("In generate annotated image function")
+
+#     # Create the folder if it doesn't exist
+#     if not os.path.exists(folder_path):
+#         os.makedirs(folder_path)
+#         print(f"Directory '{folder_path}' created successfully")
+
+#     # Iterate over all detection results
 #     for result in results:
-#         if result.boxes:
+#         if result.boxes:  # Ensure there are bounding boxes in the result
+#             print(f"Found {len(result.boxes)} bounding boxes.")
+
+#             # Iterate over each detected bounding box
 #             for box in result.boxes:
-#                 if len(box.xywh) == 4:
-#                     x_center, y_center, width, height = box.xywh[0]
+#                 # Ensure the bounding box has the expected xywh format with 4 values
+#                 if box.xywh.shape[-1] == 4:
+#                     # Extract the xywh from the tensor and convert it to a list
+#                     xywh = box.xywh.squeeze().tolist()
+
+#                     # Now we have a list of 4 values we can unpack
+#                     x_center, y_center, width, height = xywh
+
+#                     # Calculate bounding box corners
 #                     x1 = x_center - width / 2
 #                     y1 = y_center - height / 2
 #                     x2 = x_center + width / 2
 #                     y2 = y_center + height / 2
-#                     draw.rectangle([x1, y1, x2, y2], outline='red', width=3)
-    
+
+#                     # Save the image to check visually
+#                     image.save("file_path")
+#                     print("Image saved successfully")
+#                 else:
+#                     # Handle cases where xywh does not have exactly 4 values
+#                     print(f"Skipping box with unexpected xywh format: {box.xywh}")
+
 #     return image
-
-def generate_annotated_image(results):
-    # Create a blank image or use an existing image
-    width, height = 640, 640  # Example dimensions
-    image = Image.new('RGB', (width, height), (255, 255, 255))  # Create a white image
-
-    # Specify the folder and file path
-    folder_path = "C:\\Users\\Mangales\\Desktop\\App\\fastapi-anvil"
-    file_path = os.path.join(folder_path, "output_image_with_boxes.png")
-
-    # Draw bounding boxes on the image
-    draw = ImageDraw.Draw(image)
-    print("In generate annotated image function")
-
-    # Create the folder if it doesn't exist
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-        print(f"Directory '{folder_path}' created successfully")
-
-    # Iterate over all detection results
-    for result in results:
-        if result.boxes:  # Ensure there are bounding boxes in the result
-            print(f"Found {len(result.boxes)} bounding boxes.")
-
-            # Iterate over each detected bounding box
-            for box in result.boxes:
-                # Ensure the bounding box has the expected xywh format with 4 values
-                if box.xywh.shape[-1] == 4:
-                    # Extract the xywh from the tensor and convert it to a list
-                    xywh = box.xywh.squeeze().tolist()
-
-                    # Now we have a list of 4 values we can unpack
-                    x_center, y_center, width, height = xywh
-
-                    # Calculate bounding box corners
-                    x1 = x_center - width / 2
-                    y1 = y_center - height / 2
-                    x2 = x_center + width / 2
-                    y2 = y_center + height / 2
-
-                    # Save the image to check visually
-                    image.save("file_path")
-                    print("Image saved successfully")
-                else:
-                    # Handle cases where xywh does not have exactly 4 values
-                    print(f"Skipping box with unexpected xywh format: {box.xywh}")
-
-    return image
 
 
 
