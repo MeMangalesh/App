@@ -1,0 +1,295 @@
+import anvil.server
+import base64
+import mysql.connector
+from mysql.connector import Error
+from ultralytics import YOLO
+from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt
+import io
+import datetime
+#added the import below for displaying data in table
+import pymysql.cursors
+
+# Load the pre-trained YOLO model
+model_path = r'C:\Users\Mangales\Desktop\App\fastapi-anvil\myenv\best.pt'
+model = YOLO(model_path)
+
+# Connect to Anvil Uplink
+anvil.server.connect("server_IOWUOSI44HSF3N6E5SOYPSWC-I5OU23DJFFSG245Z")
+
+###########
+# get images
+###########
+
+@anvil.server.callable
+def get_images():
+    connection = create_connection()
+    if not connection:
+        return {"status": "error", "message": "Database connection failed"}
+
+    try:
+        print("inside get images vscode function")
+        # Use cursor to execute query
+        cursor = connection.cursor(dictionary=True)
+        query = """
+        SELECT image_id, processed_image_base64
+        FROM potholes_undetected
+        WHERE pothole_detected = 0
+        """
+        cursor.execute(query)
+        result = cursor.fetchall()
+
+        decoded_results = [{
+            'id': row['image_id'],
+            'image_base64': row['processed_image_base64']            
+        } for row in result]
+
+        print("Outside decoded results for loop")
+        return {"status": "success", "data": decoded_results}
+    
+    except pymysql.Error as e:
+        print(f"Database error: {e}")
+        return {"status": "error", "message": f"Database error: {e}"}
+    
+    finally:
+        connection.close()    
+
+###########
+# END get images
+###########
+
+# get_data based on date filter for reviewing images
+# @anvil.server.callable
+# def get_data_by_date(start_date, end_date):
+#     connection = create_connection()
+#     if not connection:
+#         return {"status": "error", "message": "Database connection failed"}
+
+#     try:
+#         # Use cursor to execute query
+#         cursor = connection.cursor(dictionary=True)  # Use dictionary=True for dict cursor
+        
+#         # Convert start_date and end_date to include time
+#         if isinstance(start_date, datetime.date):
+#             start_date = datetime.datetime.combine(start_date, datetime.time.min)  # Start at 12:00 AM
+#         if isinstance(end_date, datetime.date):
+#             end_date = datetime.datetime.combine(end_date, datetime.time.max)  # End at 11:59:59 PM
+        
+#         # Ensure the dates are formatted correctly
+#         start_date_str = start_date.strftime("%Y-%m-%d %H:%M:%S")
+#         end_date_str = end_date.strftime("%Y-%m-%d %H:%M:%S")
+
+#         query = """
+#         SELECT image_id, processed_image_base64
+#         FROM potholes_undetected
+#         WHERE pothole_detected = 0 AND
+#         review_dt BETWEEN %s AND %s
+#         """
+#         cursor.execute(query, (start_date_str, end_date_str))
+#         result = cursor.fetchall()
+
+#         # # Convert datetime objects to strings
+#         # for row in result:
+#         #     if isinstance(row['created_at'], datetime.datetime):
+#         #         row['created_at'] = row['created_at'].strftime("%Y-%m-%d %H:%M:%S")
+#         #     if isinstance(row['updated_at'], datetime.datetime):
+#         #         row['updated_at'] = row['updated_at'].strftime("%Y-%m-%d %H:%M:%S")
+
+                
+#         decoded_results = [{
+#             'id': row['image_id'],
+#             'image_base64': row['processed_image_base64']            
+#         } for row in result]
+
+#         return {"status": "success", "data": decoded_results}
+    
+#     except pymysql.Error as e:
+#         print(f"Database error: {e}")
+#         return {"status": "error", "message": f"Database error: {e}"}
+    
+#     finally:
+#         connection.close()
+
+@anvil.server.callable
+def get_data_by_date(start_date, end_date):
+
+    print(f"Start date & end date passed:{start_date} and {end_date}")
+    print("Inside get_data_by_date")
+    
+    connection = create_connection()
+    if not connection:
+        return {"status": "error", "message": "Database connection failed"}
+
+    try:
+        # Use cursor to execute query
+        cursor = connection.cursor(dictionary=True)  # Use dictionary=True for dict cursor
+
+        if start_date is None and end_date is None:
+            # No date filter, fetch all records
+            query = """
+            SELECT image_id, processed_image_base64, processed_dt
+            FROM potholes_undetected
+            WHERE pothole_detected = 0
+            """
+            cursor.execute(query)
+        else:
+            # Convert start_date and end_date to just dates (exclude time)
+            
+            # if isinstance(start_date, datetime.date):
+            #     start_date_str = start_date.strftime("%Y-%m-%d")
+            # if isinstance(end_date, datetime.date):
+            #     end_date_str = end_date.strftime("%Y-%m-%d")
+
+            # print(f"Start Date: {start_date_str}, End Date: {end_date_str}")
+
+              # Convert start_date and end_date to just dates (exclude time)
+            if isinstance(start_date, datetime.date):
+                start_date_str = start_date.strftime("%Y-%m-%d")
+            if isinstance(end_date, datetime.date):
+                end_date_str = end_date.strftime("%Y-%m-%d")
+
+            print(f"Start Date: {start_date_str}, End Date: {end_date_str}")
+            
+            # Query to match only the date part of review_dt
+            query = """
+            SELECT image_id, processed_image_base64, processed_dt
+            FROM potholes_undetected
+            WHERE pothole_detected = 0 AND
+            DATE(processed_dt) BETWEEN %s AND %s
+            """
+            cursor.execute(query, (start_date_str, end_date_str))
+
+        result = cursor.fetchall()
+
+        # Convert result into a list of dictionaries
+        decoded_results = [{
+            'id': row['image_id'],
+            'image_base64': row['processed_image_base64'],
+            'processed_dt': row['processed_dt'].strftime("%Y-%m-%d") if row['processed_dt'] else None
+        } for row in result]
+
+        return {"status": "success", "data": decoded_results}
+    
+    except pymysql.Error as e:
+        print(f"Database error: {e}")
+        return {"status": "error", "message": f"Database error: {e}"}
+    
+    finally:
+        connection.close()
+
+
+
+############################
+## Save manual review result
+############################
+
+@anvil.server.callable
+def save_review(image_id):
+    try:
+        connection = create_connection()
+        if not connection:
+            return {"status": "error", "message": "Database connection failed"}
+
+        with connection.cursor() as cursor:
+            try:
+                print("About to update the potholes_undetected table with reviewed results")
+                sql = """
+                    UPDATE potholes_undetected
+                    SET pothole_detected = TRUE, detection_accuracy = FALSE, review_dt = NOW()
+                    WHERE image_id = %s
+                """
+                cursor.execute(sql, (image_id,))  # Corrected to a tuple
+                connection.commit()
+
+                print(f"Updated manual review for image_ID: {image_id}")
+                return {"status": "success", "message": f"Review updated for ID: {image_id}"}
+            except Exception as e:
+                connection.rollback()  # Rollback in case of an error during the query execution
+                return {"status": "error", "message": f"Failed to update review: {str(e)}"}
+    except Exception as e:
+        return {"status": "error", "message": f"An error occurred: {str(e)}"}
+    finally:
+        if connection:
+            connection.close()  # Ensures the connection is closed after execution
+
+
+@anvil.server.callable
+# Function to detect potholes in an image
+def detect_potholes(image_base64, filename):
+    try:
+        # Decode the base64 image
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+
+        # Convert the image to RGB if it's not already
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        # Perform detection using the YOLO model
+        results = model(image)
+
+        # Process each result in the list 
+        # Parse the detection results
+        pothole_detected = False
+        potholes_count = 0
+        result_img_pil = None  # To store the final image
+
+        # Iterate over the results and check for the pothole class
+        for result in results:
+            # Assuming `result` is your output from YOLO
+            result_img = result.plot()  # Get the annotated image as a NumPy array
+
+            # Convert the NumPy array to a PIL Image
+            result_img_pil = Image.fromarray(result_img)  # Convert to PIL Image
+            
+            if result.boxes:
+                pothole_detected = True
+                potholes_count += len(result.boxes)
+                #print(f"Iteration: {result} , pothole_detected: {pothole_detected}, pothole_count: {potholes_count}")
+       
+        # Convert the PIL Image to bytes
+        if result_img_pil is not None:
+            buffered = io.BytesIO()
+            result_img_pil.save(buffered, format="PNG")
+            image_bytes = buffered.getvalue()
+
+            # Encode the image bytes to base64
+            processed_image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        else:
+            processed_image_base64 = None
+        return pothole_detected, potholes_count, processed_image_base64
+
+    except Exception as e:
+        print(f"Error in detect_potholes: {e}")
+        return []
+    
+######################
+####  DATABASE    ####
+######################
+
+# Database connection function
+def create_connection():
+    try:
+        connection = mysql.connector.connect(
+            host="127.0.0.1",
+            user="root",
+            password="dbpodv1",
+            database="potholes"
+        )
+        return connection
+    except Error as e:
+        print(f"The error '{e}' occurred")
+        return None
+
+# Execute Query 
+def execute_query(connection, query):
+    cursor = connection.cursor()
+    try:
+        cursor.execute(query)
+        connection.commit()
+        print("Query executed successfully")
+    except Error as e:
+        print(f"The error '{e}' occurred")
+
+# Keep the script running
+anvil.server.wait_forever()
